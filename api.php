@@ -12026,6 +12026,8 @@ namespace Tqdev\PhpCrudApi {
     use Tqdev\PhpCrudApi\RequestFactory;
     use Tqdev\PhpCrudApi\ResponseUtils;
 
+    include 'RacegoController.php';
+
     $config = new Config([
         // 'driver' => 'mysql',
         // 'address' => 'localhost',
@@ -12033,6 +12035,8 @@ namespace Tqdev\PhpCrudApi {
         'username' => 'root',
         'password' => '',
         'database' => 'test',
+        'controllers' => '',
+        'customControllers' => 'RacegoController',
         // 'debug' => false
     ]);
     $request = RequestFactory::fromGlobals();
