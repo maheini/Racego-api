@@ -23,20 +23,19 @@ class RacegoController {
 
     public function getUser(ServerRequestInterface $request)
     {
-        $sql = 'SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM user WHERE user_id;';
-        $parameters = [];
+        $sql = "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count 
+        FROM user LEFT JOIN laps ON user.user_id = laps.user_id_ref 
+        GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
 
         $pdo = $this->db->pdo();
+        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($parameters);
+        $stmt->execute([]);
 
         $record = $stmt->fetchAll() ?: null;
         if ($record === null) {
             return $this->responder->success([]);
         }
-        return $this->responder->success(array($record));
-        $records = array($record[0]);
-
-        return $this->responder->success($records);
+        return $this->responder->success($record);
     }
 }
