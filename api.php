@@ -12034,7 +12034,7 @@ namespace Tqdev\PhpCrudApi {
         // 'port' => '3306',
         'username' => 'root',
         'password' => '',
-        'database' => 'test',
+        'database' => 'racego',
         'controllers' => '',
         'customControllers' => 'RacegoController',
         // 'debug' => false
