@@ -89,12 +89,8 @@ class RacegoController {
         $record = (object)[
             'state' => 'new_state'
         ];
-        return $this->responder->success($this->record_service->update( 'book', $id, $record, [])); */
+        return $this->responder->success($this->record_service->update( 'book', $id, $record, []));
 
-    }
+    } */
 
-    public function getUserDetails(ServerRequestInterface $request)
-    {
-        
-    }
 }
