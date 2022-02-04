@@ -12037,7 +12037,7 @@ namespace Tqdev\PhpCrudApi {
         'database' => 'racego',
         'controllers' => '',
         'customControllers' => 'RacegoController',
-        // 'debug' => false
+        'debug' => true
     ]);
     $request = RequestFactory::fromGlobals();
     $api = new Api($config);
