@@ -46,20 +46,20 @@ class RacegoController {
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
 
         $body = $request->getParsedBody();
-        $id = property_exists($body, 'id') ? $body->id : 0;
         if(!property_exists($body, 'id') || !property_exists($body, 'first_name') || !property_exists($body, 'last_name'))
         {
             return $this->responder->error($code_record_not_found , 34);
         }
-
+        // prepare query
         $sql = "UPDATE `user` SET surname = :last_name, forname = :first_name WHERE user_id = :id";
         $stmt = $this->db->pdo()->prepare($sql);
-        
+        // bind values
         $stmt->bindParam(':id', $body->id, PDO::PARAM_INT);
         $stmt->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $stmt->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
-
+        //execute
         $stmt->execute();
+        //return
         return $this->responder->success(['affected_rows' =>  $stmt->rowCount()]);
     }
     
