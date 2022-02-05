@@ -17,6 +17,7 @@ class RacegoController {
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
         $router->register('GET', '/v1/user', array($this, 'getUser'));
+        $router->register('GET', '/v1/track', array($this, 'getTrack'));
         $router->register('PUT', '/v1/set_user', array($this, 'putUser'));
         $this->responder = $responder;
         $this->db = $db;
@@ -27,6 +28,24 @@ class RacegoController {
         $sql = "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count 
         FROM user LEFT JOIN laps ON user.user_id = laps.user_id_ref 
         GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
+
+        $pdo = $this->db->pdo();
+        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+
+        $record = $stmt->fetchAll() ?: null;
+        if ($record === null) {
+            return $this->responder->success([]);
+        }
+        return $this->responder->success($record);
+    }
+
+    public function getTrack(ServerRequestInterface $request)
+    {
+        $sql = "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track
+                LEFT JOIN user 
+                ON track.user_id_ref = user.user_id ORDER BY track.id";
 
         $pdo = $this->db->pdo();
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
