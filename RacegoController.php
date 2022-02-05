@@ -42,14 +42,22 @@ class RacegoController {
 
     public function putUser(ServerRequestInterface $request)
     {
-        $code_record_not_found = Tqdev\PhpCrudApi\Record\ErrorCode::RECORD_NOT_FOUND;
-        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
-
+        //input validation
         $body = $request->getParsedBody();
-        if(!property_exists($body, 'id') || !property_exists($body, 'first_name') || !property_exists($body, 'last_name'))
+        if( !$body || 
+            !property_exists($body, 'id') || 
+            !property_exists($body, 'first_name') || 
+            !property_exists($body, 'last_name'))
         {
-            return $this->responder->error($code_record_not_found , 34);
+            return $this->responder->error($code_validation_failed , "user");
         }
+        else if($body->id <= 0 ||
+                empty($body->first_name) || 
+                empty($body->last_name))
+        {
+            return $this->responder->error($code_validation_failed , "user");
+        }
+
         // prepare query
         $sql = "UPDATE `user` SET surname = :last_name, forname = :first_name WHERE user_id = :id";
         $stmt = $this->db->pdo()->prepare($sql);
