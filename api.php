@@ -12037,7 +12037,17 @@ namespace Tqdev\PhpCrudApi {
         'database' => 'racego',
         'controllers' => '',
         'customControllers' => 'RacegoController',
-        'debug' => true
+        'debug' => true,
+        
+        // login and registration
+        'middlewares' => 'dbAuth',
+        'dbAuth.registerUser' => '1',
+        'dbAuth.usersTable' => 'login',
+        'dbAuth.usernameColumn' => 'username',
+        'dbAuth.passwordColumn' => 'password',
+        'dbAuth.passwordLength' => '6'
+
+        
     ]);
     $request = RequestFactory::fromGlobals();
     $api = new Api($config);
