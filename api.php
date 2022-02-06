@@ -12040,12 +12040,17 @@ namespace Tqdev\PhpCrudApi {
         'debug' => true,
         
         // login and registration
-        'middlewares' => 'dbAuth',
+        'middlewares' => 'dbAuth,authorization',
+        'authorization.tableHandler' => function ($operation, $tableName) {
+            return $tableName != 'users';
+        },
+        'dbAuth.sessionName' => 'TOKEN',
+        'dbAuth.returnedColumns' => 'username',
         'dbAuth.registerUser' => '1',
         'dbAuth.usersTable' => 'login',
         'dbAuth.usernameColumn' => 'username',
         'dbAuth.passwordColumn' => 'password',
-        'dbAuth.passwordLength' => '6'
+        'dbAuth.passwordLength' => '8',
 
         
     ]);
