@@ -17,6 +17,7 @@ class RacegoController {
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
         $router->register('GET', '/v1/user', array($this, 'getUser'));
+        $router->register('POST', '/v1/user', array($this, 'addUser'));
         $router->register('GET', '/v1/track', array($this, 'getTrack'));
         $router->register('PUT', '/v1/set_user', array($this, 'putUser'));
         $this->responder = $responder;
@@ -39,6 +40,51 @@ class RacegoController {
             return $this->responder->success([]);
         }
         return $this->responder->success($record);
+    }
+
+    public function addUser(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || 
+            !property_exists($body, 'first_name') || 
+            !property_exists($body, 'last_name'))
+        {
+            return $this->responder->error($code_validation_failed, "add user", "Invalid input data");
+        }
+        else if(empty($body->first_name) || 
+                empty($body->last_name))
+        {
+            return $this->responder->error($code_validation_failed , "add user", "Input data is empty");
+        }
+        
+        // check existence
+        $sql = "SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
+        $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount > 0)
+        {
+            return $this->responder->error($code_entry_exists , "add user", "Entry already exists");
+        }
+
+        // insert
+        $sql = "INSERT INTO `user` (user.forname, user.surname) VALUES (:first_name, :last_name)";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
+        $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->execute();
+        
+        // get new id
+        $result = $this->db->pdo()->prepare("SELECT LAST_INSERT_ID()");
+        $result->execute();
+        $pkValue = $result->fetchColumn(0);
+        return $this->responder->success(['inserted_id' =>  (int) $pkValue]);
     }
 
     public function getTrack(ServerRequestInterface $request)
