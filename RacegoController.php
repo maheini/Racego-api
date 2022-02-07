@@ -18,6 +18,7 @@ class RacegoController {
     {
         $router->register('GET', '/v1/user', array($this, 'getUser'));
         $router->register('POST', '/v1/user', array($this, 'addUser'));
+        $router->register('DELETE', '/v1/user', array($this, 'deleteUser'));
         $router->register('GET', '/v1/track', array($this, 'getTrack'));
         $router->register('PUT', '/v1/set_user', array($this, 'putUser'));
         $this->responder = $responder;
@@ -85,6 +86,61 @@ class RacegoController {
         $result->execute();
         $pkValue = $result->fetchColumn(0);
         return $this->responder->success(['inserted_id' =>  (int) $pkValue]);
+    }
+
+    public function deleteUser(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
+        $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || 
+            !property_exists($body, 'id'))
+        {
+            return $this->responder->error($code_validation_failed, "delete user", "Invalid input data");
+        }
+        else if(empty($body->id) || 
+                $body->id <= 0)
+        {
+            return $this->responder->error($code_validation_failed , "delete user", "ID is empty or invalid");
+        }
+
+        $pdo = $this->db->pdo();
+
+        // start transaction
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
+
+        // remove cathegories from user
+        $sql = "DELETE FROM user_class WHERE user_class.user_id_ref = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+
+        // remove laps from user
+        $sql = "DELETE FROM laps WHERE laps.user_id_ref = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+
+        // remove from track
+        $sql = "DELETE FROM track WHERE track.user_id_ref = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+        
+        // remove user
+        $sql = "DELETE FROM user WHERE user.user_id = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        // return
+        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
 
     public function getTrack(ServerRequestInterface $request)
