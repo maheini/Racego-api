@@ -21,6 +21,7 @@ class RacegoController {
         $router->register('POST', '/v1/user', array($this, 'addUser'));
         $router->register('DELETE', '/v1/user', array($this, 'deleteUser'));
         $router->register('PUT', '/v1/user', array($this, 'updateUser'));       // rework!
+        $router->register('POST', '/v1/ontrack', array($this, 'addOntrack'));
         $this->responder = $responder;
         $this->db = $db;
     }
@@ -191,6 +192,53 @@ class RacegoController {
         $stmt->execute();
         //return
         return $this->responder->success(['affected_rows' =>  $stmt->rowCount()]);
+    }
+
+    public function addOntrack(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || 
+            !property_exists($body, 'id'))
+        {
+            return $this->responder->error($code_validation_failed, "post ontrack", "Invalid input data");
+        }
+        else if(empty($body->id) || 
+                $body->id <= 0)
+        {
+            return $this->responder->error($code_validation_failed , "post ontrack", "Input data is empty");
+        }
+        
+        // check if user_id is valid
+        $sql = "SELECT COUNT(*) FROM `user` WHERE user.user_id = :id";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount != 1) return $this->responder->error($code_validation_failed , "post ontrack", "User doesn't exists");
+
+        // check if user is already on track
+        $sql = "SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount > 0) return $this->responder->error($code_entry_exists , "post ontrack", "User is already on track");
+
+        // insert
+        $sql = "INSERT INTO `track` (track.user_id_ref) VALUES (:id)";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+        
+        // get new id
+        $result = $this->db->pdo()->prepare("SELECT LAST_INSERT_ID()");
+        $result->execute();
+        $pkValue = $result->fetchColumn(0);
+        return $this->responder->success(['result' =>  'successful']);
     }
     
 }
