@@ -24,6 +24,7 @@ class RacegoController {
         $router->register('POST', '/v1/ontrack', array($this, 'addOntrack'));
         $router->register('DELETE', '/v1/ontrack', array($this, 'deleteOntrack'));
         $router->register('PUT', '/v1/ontrack', array($this, 'addLap'));
+        $router->register('GET', '/v1/cathegories', array($this, 'getCathegories'));
         $this->responder = $responder;
         $this->db = $db;
         $this->db->pdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -36,7 +37,7 @@ class RacegoController {
         GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
 
         $pdo = $this->db->pdo();
-        
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
 
@@ -54,7 +55,7 @@ class RacegoController {
                 ON track.user_id_ref = user.user_id ORDER BY track.id";
 
         $pdo = $this->db->pdo();
-        
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
 
@@ -324,6 +325,21 @@ class RacegoController {
 
         // return
         return $this->responder->success(['result' =>  'successful']);
+    }
+
+    public function getCathegories(ServerRequestInterface $request)
+    {
+        $sql = "SELECT DISTINCT class FROM user_class";
+
+        $pdo = $this->db->pdo();
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+
+        $record = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: null;
+        if ($record === null) {
+            return $this->responder->success([]);
+        }
+        return $this->responder->success($record);
     }
 
     function isValidTime(string $time, string $format = 'H:i:s.v'): bool
