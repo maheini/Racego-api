@@ -26,6 +26,7 @@ class RacegoController {
         $router->register('PUT', '/v1/ontrack', array($this, 'addLap'));
         $this->responder = $responder;
         $this->db = $db;
+        $this->db->pdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     }
 
     public function getUser(ServerRequestInterface $request)
@@ -35,7 +36,7 @@ class RacegoController {
         GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
 
         $pdo = $this->db->pdo();
-        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
 
@@ -53,7 +54,7 @@ class RacegoController {
                 ON track.user_id_ref = user.user_id ORDER BY track.id";
 
         $pdo = $this->db->pdo();
-        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
 
