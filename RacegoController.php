@@ -23,6 +23,7 @@ class RacegoController {
         $router->register('PUT', '/v1/user', array($this, 'updateUser'));       // rework!
         $router->register('POST', '/v1/ontrack', array($this, 'addOntrack'));
         $router->register('DELETE', '/v1/ontrack', array($this, 'deleteOntrack'));
+        $router->register('PUT', '/v1/ontrack', array($this, 'addLap'));
         $this->responder = $responder;
         $this->db = $db;
     }
@@ -267,6 +268,67 @@ class RacegoController {
 
         // return
         return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
+    }
+
+    public function addLap(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || 
+            !property_exists($body, 'id') || 
+            !property_exists($body, 'time'))
+        {
+            return $this->responder->error($code_validation_failed, "put ontrack", "Invalid input data");
+        }
+        else if(empty($body->id) || 
+                $body->id <= 0 ||
+                empty($body->time) ||
+                !$this->isValidTime($body->time))
+        {
+            return $this->responder->error($code_validation_failed , "put ontrack", "ID/time is empty or invalid");
+        }
+
+        // check if user_id is on_track
+        $sql = "SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount != 1) return $this->responder->error($code_validation_failed , "put ontrack", "User isn't on track");
+
+        // add time and remove user from track
+        $pdo = $this->db->pdo();
+        
+        // start transaction
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
+
+        // insert time
+        $sql = "INSERT INTO laps (lap_time, user_id_ref) VALUES (:time, :id)";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':time', $body->time, PDO::PARAM_STR);
+        $result->execute();
+
+        // remove user from track
+        $sql = "DELETE FROM track WHERE track.user_id_ref = :id";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        // return
+        return $this->responder->success(['result' =>  'successful']);
+    }
+
+    function isValidTime(string $time, string $format = 'H:i:s.v'): bool
+    {
+        $timeObj = DateTime::createFromFormat($format, $time);
+        return $timeObj && $timeObj->format($format) == $time;
     }
     
 }
