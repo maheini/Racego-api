@@ -251,12 +251,12 @@ class RacegoController {
         if( !$body || 
             !property_exists($body, 'id'))
         {
-            return $this->responder->error($code_validation_failed, "delete user", "Invalid input data");
+            return $this->responder->error($code_validation_failed, "delete ontrack", "Invalid input data");
         }
         else if(empty($body->id) || 
                 $body->id <= 0)
         {
-            return $this->responder->error($code_validation_failed , "delete user", "ID is empty or invalid");
+            return $this->responder->error($code_validation_failed , "delete ontrack", "ID is empty or invalid");
         }
 
         // remove cathegories from user
