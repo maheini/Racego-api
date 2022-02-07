@@ -22,6 +22,7 @@ class RacegoController {
         $router->register('DELETE', '/v1/user', array($this, 'deleteUser'));
         $router->register('PUT', '/v1/user', array($this, 'updateUser'));       // rework!
         $router->register('POST', '/v1/ontrack', array($this, 'addOntrack'));
+        $router->register('DELETE', '/v1/ontrack', array($this, 'deleteOntrack'));
         $this->responder = $responder;
         $this->db = $db;
     }
@@ -239,6 +240,33 @@ class RacegoController {
         $result->execute();
         $pkValue = $result->fetchColumn(0);
         return $this->responder->success(['result' =>  'successful']);
+    }
+
+    public function deleteOntrack(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || 
+            !property_exists($body, 'id'))
+        {
+            return $this->responder->error($code_validation_failed, "delete user", "Invalid input data");
+        }
+        else if(empty($body->id) || 
+                $body->id <= 0)
+        {
+            return $this->responder->error($code_validation_failed , "delete user", "ID is empty or invalid");
+        }
+
+        // remove cathegories from user
+        $sql = "DELETE FROM track WHERE track.user_id_ref = :id";
+        $result = $this->db->pdo()->prepare($sql);
+        $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->execute();
+
+        // return
+        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
     
 }
