@@ -12042,7 +12042,7 @@ namespace Tqdev\PhpCrudApi {
         'debug' => true,
         
         // login and registration
-        'middlewares' => 'dbAuth,authorization',
+        'middlewares' => 'cors,dbAuth,authorization',
         'authorization.tableHandler' => function ($operation, $tableName) {
             return $tableName != 'users';
         },
