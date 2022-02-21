@@ -171,6 +171,8 @@ class RacegoController {
 
     public function updateUser(ServerRequestInterface $request)
     {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        
         //input validation
         $body = $request->getParsedBody();
         if( !$body || 
