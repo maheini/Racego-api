@@ -16,14 +16,16 @@ class RacegoController {
 
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
-        $router->register('GET', '/v1/user', array($this, 'getUser'));          // rework!
-        $router->register('GET', '/v1/track', array($this, 'getTrack'));        // rework!
+        // TODO:    add function to update user and add get user details
+        //          maybe even switch route from /v1/user to /v1/overview or something similar
+        $router->register('GET', '/v1/user', array($this, 'getUser'));       
+        $router->register('GET', '/v1/track', array($this, 'getTrack'));
         $router->register('POST', '/v1/user', array($this, 'addUser'));
         $router->register('DELETE', '/v1/user', array($this, 'deleteUser'));
         $router->register('PUT', '/v1/user', array($this, 'updateUser'));       // rework!
         $router->register('POST', '/v1/ontrack', array($this, 'addOntrack'));
-        $router->register('DELETE', '/v1/ontrack', array($this, 'deleteOntrack'));
-        $router->register('PUT', '/v1/ontrack', array($this, 'addLap'));
+        $router->register('DELETE', '/v1/ontrack', array($this, 'cancelLap'));
+        $router->register('PUT', '/v1/ontrack', array($this, 'submitLap'));
         $router->register('GET', '/v1/cathegories', array($this, 'getCathegories'));
         $this->responder = $responder;
         $this->db = $db;
@@ -245,7 +247,7 @@ class RacegoController {
         return $this->responder->success(['result' =>  'successful']);
     }
 
-    public function deleteOntrack(ServerRequestInterface $request)
+    public function cancelLap(ServerRequestInterface $request)
     {
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
 
@@ -272,7 +274,7 @@ class RacegoController {
         return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
 
-    public function addLap(ServerRequestInterface $request)
+    public function submitLap(ServerRequestInterface $request)
     {
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
