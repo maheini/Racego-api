@@ -27,6 +27,7 @@ class RacegoController {
         $router->register('PUT', '/v1/ontrack', array($this, 'submitLap'));
         $router->register('GET', '/v1/cathegories', array($this, 'getCathegories'));
         $router->register('GET', '/v1/user/*', array($this, 'getUserDetails'));
+        $router->register('PUT', '/v1/user/*', array($this, 'setUserDetails'));
         $this->responder = $responder;
         $this->db = $db;
         $this->db->pdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -388,6 +389,84 @@ class RacegoController {
 
         // return
         return $this->responder->success($response);
+    }
+
+    public function setUserDetails(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
+        $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
+
+        //input validation
+        $id = Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3);
+        $body = $request->getParsedBody();
+        if( !$body || !isset($id) || !isset($body->first_name)||!isset($body->last_name))
+            return $this->responder->error($code_validation_failed, "update user", "Invalid input data");
+        else if($id <= 0 || empty($body->first_name) || empty($body->last_name))
+            return $this->responder->error($code_validation_failed , "update user", "input is empty or invalid");
+
+        // start transaction
+        $pdo = $this->db->pdo();
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
+
+        // check if any user with id exists
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user_id = :id");
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount <= 0) return $this->responder->error($code_validation_failed , "update user", "ID invalid");
+
+        // check if first_name and last_name are already given
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user_id <> :id");
+        $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
+        $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        $recordcount = $result->fetchColumn();
+        if($recordcount > 0) return $this->responder->error($code_entry_exists , "update user", "first_name and last_name already exist");
+
+        // update user
+        $result = $pdo->prepare("UPDATE `user` SET forname = :first_name, surname = :last_name WHERE user_id = :id");
+        $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
+        $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+
+        // delete all race-classes
+        $result = $pdo->prepare("DELETE FROM user_class WHERE user_id_ref = :id");
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        // add all race_class
+        if(!empty($body->class) && is_array($body->class)){
+            foreach($body->class as $classname){}
+                if(!empty($classname) && is_string($classname)){
+                    $result = $pdo->prepare("INSERT INTO user_class (class, user_id_ref) VALUES (:class, :id)");
+                    $result->bindParam(':class', $classname, PDO::PARAM_STR);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "class is invalid");
+        }
+
+        // delete all lap-times
+        $result = $pdo->prepare("DELETE FROM laps WHERE user_id_ref = :id");
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        // add all lap_times
+        if(!empty($body->laps) && is_array($body->laps)){
+            foreach($body->laps as $lap_time)
+                if(!empty($lap_time) && $this->isValidTime($lap_time)){
+                    $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:lap_time, :id)");
+                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
+        }
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        // return
+        return $this->responder->success(['result' => 'successful']);
     }
 
     function isValidTime(string $time, string $format = 'H:i:s.v'): bool
