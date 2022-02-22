@@ -16,8 +16,7 @@ class RacegoController {
 
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
-        // TODO:    add function to update user and add get user details
-        //          maybe even switch route from /v1/user to /v1/overview or something similar
+        // TODO:    add function to update user and add user details
         $router->register('GET', '/v1/user', array($this, 'getUser'));       
         $router->register('GET', '/v1/track', array($this, 'getTrack'));
         $router->register('POST', '/v1/user', array($this, 'addUser'));
@@ -27,6 +26,7 @@ class RacegoController {
         $router->register('DELETE', '/v1/ontrack', array($this, 'cancelLap'));
         $router->register('PUT', '/v1/ontrack', array($this, 'submitLap'));
         $router->register('GET', '/v1/cathegories', array($this, 'getCathegories'));
+        $router->register('GET', '/v1/user/*', array($this, 'getUserDetails'));
         $this->responder = $responder;
         $this->db = $db;
         $this->db->pdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -344,6 +344,50 @@ class RacegoController {
             return $this->responder->success([]);
         }
         return $this->responder->success($record);
+    }
+
+    public function getUserDetails(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        
+        //input validation
+        $id = Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3);
+        if( !isset($id) || $id <= 0)
+        {
+            return $this->responder->error($code_validation_failed, "get userdetails", "Invalid input data");
+        }
+        $pdo = $this->db->pdo();
+
+        // get general user_data
+        $sql = "SELECT user_id AS id, forname AS first_name, surname AS last_name  FROM `user` WHERE user_id = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        if( !$userData = $result->fetch()){
+            return $this->responder->error($code_validation_failed, "get userdetails", "No user found with this ID");
+        }
+
+        // get user classes
+        $sql = "SELECT class FROM user_class WHERE user_id_ref = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        $classData = $result->fetchAll(PDO::FETCH_COLUMN) ?: null;
+
+        // get laps
+        $sql = "SELECT lap_time FROM laps WHERE user_id_ref = :id";
+        $result = $pdo->prepare($sql);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->execute();
+        $lapData = $result->fetchAll(PDO::FETCH_COLUMN) ?: null;
+
+        $response = (object) ['id' => $userData["id"], 'first_name' => $userData["first_name"], 'last_name' => $userData["last_name"]];
+
+        $response->class = $classData?$classData:[];
+        $response->laps = $lapData?$lapData:[];
+
+        // return
+        return $this->responder->success($response);
     }
 
     function isValidTime(string $time, string $format = 'H:i:s.v'): bool
