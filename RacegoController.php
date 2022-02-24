@@ -141,13 +141,14 @@ class RacegoController {
         $result->execute();
         // add all race_class
         if(!empty($body->class) && is_array($body->class)){
-            foreach($body->class as $classname){}
+            foreach($body->class as $classname){
                 if(!empty($classname) && is_string($classname)){
                     $result = $pdo->prepare("INSERT INTO user_class (class, user_id_ref) VALUES (:class, :id)");
                     $result->bindParam(':class', $classname, PDO::PARAM_STR);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
                     $result->execute();
                 } else return $this->responder->error($code_validation_failed , "update user", "class is invalid");
+            }
         }
 
         // delete all lap-times
@@ -156,13 +157,14 @@ class RacegoController {
         $result->execute();
         // add all lap_times
         if(!empty($body->laps) && is_array($body->laps)){
-            foreach($body->laps as $lap_time)
+            foreach($body->laps as $lap_time){
                 if(!empty($lap_time) && $this->isValidTime($lap_time)){
                     $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:lap_time, :id)");
                     $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
                     $result->execute();
                 } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
+            }
         }
 
         // commit transaction
