@@ -10557,6 +10557,7 @@ namespace Tqdev\PhpCrudApi\Record {
         const PAGINATION_FORBIDDEN = 1019;
         const USER_ALREADY_EXIST = 1020;
         const PASSWORD_TOO_SHORT = 1021;
+        const ENTRY_ALREADY_EXISTS = 1022;
 
         private $values = [
             0000 => ["Success", ResponseFactory::OK],
@@ -10582,6 +10583,7 @@ namespace Tqdev\PhpCrudApi\Record {
             1019 => ["Pagination forbidden", ResponseFactory::FORBIDDEN],
             1020 => ["User '%s' already exists", ResponseFactory::CONFLICT],
             1021 => ["Password too short (<%d characters)", ResponseFactory::UNPROCESSABLE_ENTITY],
+            1022 => ["Entry '%s' already exists", ResponseFactory::CONFLICT],
             9999 => ["%s", ResponseFactory::INTERNAL_SERVER_ERROR],
         ];
 
