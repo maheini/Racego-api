@@ -76,13 +76,13 @@ class RacegoController {
             return $this->responder->error($code_validation_failed, "get userdetails", "No user found with this ID");
 
         // get user classes
-        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id");
+        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id ORDER BY class");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
         $classData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         // get laps
-        $result = $pdo->prepare("SELECT lap_time FROM laps WHERE user_id_ref = :id");
+        $result = $pdo->prepare("SELECT lap_time FROM laps WHERE user_id_ref = :id ORDER BY id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
         $lapData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
@@ -347,7 +347,7 @@ class RacegoController {
     public function getCategories()
     {
         $pdo = $this->db->pdo();
-        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class");
+        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class ORDER BY class");
         $stmt->execute();
         $record = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
         return $this->responder->success($record);
