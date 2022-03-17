@@ -26,6 +26,7 @@ class RacegoController {
         $router->register('DELETE', '/v1/ontrack', array($this, 'cancelLap'));
         $router->register('PUT', '/v1/ontrack', array($this, 'submitLap'));
         $router->register('GET', '/v1/categories', array($this, 'getCategories'));
+        $router->register('GET', '/v1/ranking/*', array($this, 'getRanking'));
 
         $this->responder = $responder;
         $this->db = $db;
@@ -351,6 +352,50 @@ class RacegoController {
         $stmt->execute();
         $record = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
         return $this->responder->success($record);
+    }
+
+    public function getRanking(ServerRequestInterface $request)
+    {
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+    
+        //input validation
+        $class = Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3);
+        
+        if( !$class || (string)$class == '')   // empty String?
+            return $this->responder->error($code_validation_failed, "get ranking", "Invalid input data");
+
+        $pdo = $this->db->pdo();
+
+        // get general user_data
+        $data = [];
+        if ($class == "all") {
+            $query = "SELECT CONCAT(`user`.forname, ' ', `user`.surname) AS name, ".
+            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%H:%i:%s.%f'),1,12)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
+            "AS 'rank' FROM laps ".
+            "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
+            "GROUP BY user_id_ref ORDER BY 'rank' ASC";
+
+            $result = $pdo->prepare($query);
+            $result->execute();
+
+            $data = $result->fetchAll() ?: [];
+        }
+        else {
+            $query = "SELECT CONCAT(`user`.forname, ' ', `user`.surname) AS name, ".
+            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%H:%i:%s.%f'),1,12)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
+            "AS 'rank' FROM laps ".
+            "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
+            "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class) ".
+            "GROUP BY user_id_ref ORDER BY 'rank' ASC";
+
+            $result = $pdo->prepare($query);
+            $result->bindParam(':class', $class, PDO::PARAM_STR);
+            $result->execute();
+
+            $data = $result->fetchAll() ?: [];
+        }
+
+        return $this->responder->success($data);
     }
 
     function isValidTime(string $time, string $format = 'H:i:s.v'): bool
