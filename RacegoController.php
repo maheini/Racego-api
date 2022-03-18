@@ -370,7 +370,7 @@ class RacegoController {
         $data = [];
         if ($class == "all") {
             $query = "SELECT CONCAT(`user`.forname, ' ', `user`.surname) AS name, ".
-            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%H:%i:%s.%f'),1,12)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
+            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
             "GROUP BY user_id_ref ORDER BY 'rank' ASC";
@@ -382,7 +382,7 @@ class RacegoController {
         }
         else {
             $query = "SELECT CONCAT(`user`.forname, ' ', `user`.surname) AS name, ".
-            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%H:%i:%s.%f'),1,12)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
+            "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
             "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class) ".
