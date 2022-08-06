@@ -35,6 +35,10 @@ class RacegoController {
 
     public function getUser(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $sql = "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count 
         FROM user LEFT JOIN laps ON user.user_id = laps.user_id_ref 
         GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
@@ -48,6 +52,10 @@ class RacegoController {
 
     public function getTrack(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $sql = "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track
                 LEFT JOIN user 
                 ON track.user_id_ref = user.user_id ORDER BY track.id";
@@ -61,6 +69,10 @@ class RacegoController {
 
     public function getUserDetails(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
     
         //input validation
@@ -99,6 +111,10 @@ class RacegoController {
 
     public function setUserDetails(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
@@ -177,6 +193,10 @@ class RacegoController {
 
     public function addUser(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
 
@@ -211,6 +231,10 @@ class RacegoController {
 
     public function deleteUser(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
 
@@ -256,6 +280,10 @@ class RacegoController {
 
     public function addOntrack(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
 
@@ -290,6 +318,10 @@ class RacegoController {
 
     public function cancelLap(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
 
         //input validation
@@ -308,6 +340,10 @@ class RacegoController {
 
     public function submitLap(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
 
@@ -347,6 +383,10 @@ class RacegoController {
 
     public function getCategories()
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $pdo = $this->db->pdo();
         $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class ORDER BY class");
         $stmt->execute();
@@ -356,6 +396,10 @@ class RacegoController {
 
     public function getRanking(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
     
         //input validation
@@ -402,6 +446,28 @@ class RacegoController {
     {
         $timeObj = DateTime::createFromFormat($format, $time);
         return $timeObj && $timeObj->format($format) == $time;
+    }
+
+    function validateRaceAccess( $raceID ){
+        $raceID = intval($raceID);
+        if ( !isset($_SESSION['user']) ){
+            return false;
+        } else if ( $raceID <= 0 ){
+            return false;
+        } else {
+            $userID = $_SESSION['user']['id'];
+            $pdo = $this->db->pdo();
+            $stmt = $pdo->prepare("SELECT * FROM race_relations WHERE login_id=:login_id AND race_id = :race_id");
+            $stmt->bindParam(':login_id', $userID, PDO::PARAM_INT);
+            $stmt->bindParam(':race_id', $raceID, PDO::PARAM_INT);
+            $stmt->execute();
+            $recordcount = $stmt->fetchColumn();
+            if( !$recordcount ){
+                return false;
+            } else {
+                return true;
+            }
+        }
     }
     
 }
