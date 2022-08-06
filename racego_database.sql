@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.1.1
+-- version 5.1.3
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Erstellungszeit: 10. Feb 2022 um 23:19
--- Server-Version: 10.4.22-MariaDB
--- PHP-Version: 8.1.2
+-- Host: localhost:3306
+-- Erstellungszeit: 06. Aug 2022 um 17:04
+-- Server-Version: 10.7.3-MariaDB-log
+-- PHP-Version: 7.4.19
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -29,6 +29,7 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `laps` (
   `id` int(11) NOT NULL,
+  `race_id` int(11) NOT NULL,
   `user_id_ref` int(11) NOT NULL,
   `lap_time` time(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -48,11 +49,36 @@ CREATE TABLE `login` (
 -- --------------------------------------------------------
 
 --
+-- Tabellenstruktur für Tabelle `race_overview`
+--
+
+CREATE TABLE `race_overview` (
+  `race_id` int(11) NOT NULL,
+  `race_name` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Tabellenstruktur für Tabelle `race_relations`
+--
+
+CREATE TABLE `race_relations` (
+  `id` int(11) NOT NULL,
+  `login_id` int(11) NOT NULL,
+  `race_id` int(11) NOT NULL,
+  `is_admin` tinyint(1) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
 -- Tabellenstruktur für Tabelle `track`
 --
 
 CREATE TABLE `track` (
   `id` int(11) NOT NULL,
+  `race_id` int(11) NOT NULL,
   `user_id_ref` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -64,6 +90,7 @@ CREATE TABLE `track` (
 
 CREATE TABLE `user` (
   `user_id` int(11) NOT NULL,
+  `race_id` int(11) NOT NULL,
   `forname` text NOT NULL,
   `surname` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -76,6 +103,7 @@ CREATE TABLE `user` (
 
 CREATE TABLE `user_class` (
   `id` int(11) NOT NULL,
+  `race_id` int(11) NOT NULL,
   `class` text NOT NULL,
   `user_id_ref` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -94,6 +122,18 @@ ALTER TABLE `laps`
 -- Indizes für die Tabelle `login`
 --
 ALTER TABLE `login`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indizes für die Tabelle `race_overview`
+--
+ALTER TABLE `race_overview`
+  ADD PRIMARY KEY (`race_id`);
+
+--
+-- Indizes für die Tabelle `race_relations`
+--
+ALTER TABLE `race_relations`
   ADD PRIMARY KEY (`id`);
 
 --
@@ -129,6 +169,18 @@ ALTER TABLE `laps`
 --
 ALTER TABLE `login`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT für Tabelle `race_overview`
+--
+ALTER TABLE `race_overview`
+  MODIFY `race_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT für Tabelle `race_relations`
+--
+ALTER TABLE `race_relations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT für Tabelle `track`
