@@ -185,9 +185,10 @@ class RacegoController {
         if(!empty($body->laps) && is_array($body->laps)){
             foreach($body->laps as $lap_time){
                 if(!empty($lap_time) && $this->isValidTime($lap_time)){
-                    $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:lap_time, :id)");
-                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
+                    $result = $pdo->prepare("INSERT INTO laps (race_id, user_id_ref, lap_time) VALUES (:race_id, :id, :lap_time)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
                     $result->execute();
                 } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
             }
