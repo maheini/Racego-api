@@ -39,11 +39,12 @@ class RacegoController {
         if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
             return $this->responder->error(401, 'Unauthorized');
         }
-        $sql = "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count 
-        FROM user LEFT JOIN laps ON user.user_id = laps.user_id_ref 
-        GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
-
+        $sql =  "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count FROM user ".
+                "LEFT JOIN laps ON user.user_id = laps.user_id_ref ".
+                "WHERE user.race_id = :race_id ".
+                "GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count;";
         $stmt = $this->db->pdo()->prepare($sql);
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
 
         $record = $stmt->fetchAll() ?: [];
@@ -56,11 +57,12 @@ class RacegoController {
         if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
             return $this->responder->error(401, 'Unauthorized');
         }
-        $sql = "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track
-                LEFT JOIN user 
-                ON track.user_id_ref = user.user_id ORDER BY track.id";
-
+        $sql =  "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track ".
+                "LEFT JOIN user ON track.user_id_ref = user.user_id  ".
+                "WHERE track.race_id = :race_id ".
+                "ORDER BY track.id";
         $stmt = $this->db->pdo()->prepare($sql);
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
 
         $record = $stmt->fetchAll() ?: [];
