@@ -377,21 +377,24 @@ class RacegoController {
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // check if user_id is on_track
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount != 1) return $this->responder->error($code_validation_failed , "put ontrack", "User isn't on track");
 
         // insert time
-        $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:time, :id)");
+        $result = $pdo->prepare("INSERT INTO laps (race_id, lap_time, user_id_ref) VALUES (:race_id, :time, :id)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
         $result->bindParam(':time', $body->time, PDO::PARAM_STR);
         $result->execute();
 
         // remove user from track
-        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // commit transaction
