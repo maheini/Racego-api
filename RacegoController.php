@@ -218,16 +218,18 @@ class RacegoController {
         $pdo = $this->db->pdo();
 
         // check existence
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user.race_id = :race_id");
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0)
             return $this->responder->error($code_entry_exists , "add user", "Entry already exists");
         
         // insert
-        $result = $pdo->prepare("INSERT INTO `user` (user.forname, user.surname) VALUES (:first_name, :last_name)");
+        $result = $pdo->prepare("INSERT INTO `user` (user.race_id, user.forname, user.surname) VALUES (:race_id, :first_name, :last_name)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
         $result->execute();
@@ -259,23 +261,27 @@ class RacegoController {
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // remove categories from user
-        $result = $pdo->prepare("DELETE FROM user_class WHERE user_class.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM user_class WHERE user_class.user_id_ref = :id AND user_class.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // remove laps from user
-        $result = $pdo->prepare("DELETE FROM laps WHERE laps.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM laps WHERE laps.user_id_ref = :id AND laps.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // remove from track
-        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         
         // remove user
-        $result = $pdo->prepare("DELETE FROM user WHERE user.user_id = :id");
+        $result = $pdo->prepare("DELETE FROM user WHERE user.user_id = :id AND user.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // commit transaction
