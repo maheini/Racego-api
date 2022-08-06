@@ -84,21 +84,24 @@ class RacegoController {
         $pdo = $this->db->pdo();
 
         // get general user_data
-        $result = $pdo->prepare("SELECT user_id AS id, forname AS first_name, surname AS last_name  FROM `user` WHERE user_id = :id");
+        $result = $pdo->prepare("SELECT user_id AS id, forname AS first_name, surname AS last_name  FROM `user` WHERE user_id = :id AND race_id = :race_id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         if( !$userData = $result->fetch())
             return $this->responder->error($code_validation_failed, "get userdetails", "No user found with this ID");
 
         // get user classes
-        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id ORDER BY class");
+        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id AND race_id = :race_id ORDER BY class");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $classData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         // get laps
-        $result = $pdo->prepare("SELECT lap_time FROM laps WHERE user_id_ref = :id ORDER BY id");
+        $result = $pdo->prepare("SELECT SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9) AS lap_time FROM laps WHERE user_id_ref = :id AND race_id = :race_id ORDER BY id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $lapData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
@@ -131,18 +134,21 @@ class RacegoController {
         $pdo = $this->db->pdo();
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
-        // check if any user with id exists
-        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user_id = :id");
+        // check if any user with id exists within the current race
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user_id = :id AND race_id = :race_id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount <= 0) return $this->responder->error($code_validation_failed , "update user", "ID invalid");
 
-        // check if first_name and last_name are already given
-        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user_id <> :id");
+        // check if first_name and last_name are already given in the current race
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` ".
+                        "WHERE user.forname = :first_name AND user.surname = :last_name AND user_id <> :id AND race_id = :race_id");
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0) return $this->responder->error($code_entry_exists , "update user", "first_name and last_name already exist");
@@ -154,15 +160,16 @@ class RacegoController {
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
 
-        // delete all race-classes
+        // delete all race-classes of the current user
         $result = $pdo->prepare("DELETE FROM user_class WHERE user_id_ref = :id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
-        // add all race_class
+        // add all race_classes to the user
         if(!empty($body->class) && is_array($body->class)){
             foreach($body->class as $classname){
                 if(!empty($classname) && is_string($classname)){
-                    $result = $pdo->prepare("INSERT INTO user_class (class, user_id_ref) VALUES (:class, :id)");
+                    $result = $pdo->prepare("INSERT INTO user_class (race_id, user_id_ref, class) VALUES (:race_id, :id, :class)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
                     $result->bindParam(':class', $classname, PDO::PARAM_STR);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
                     $result->execute();
