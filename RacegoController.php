@@ -404,14 +404,15 @@ class RacegoController {
         return $this->responder->success(['result' =>  'successful']);
     }
 
-    public function getCategories()
+    public function getCategories($request)
     {
         $header = $request->getServerParams();
         if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
             return $this->responder->error(401, 'Unauthorized');
         }
         $pdo = $this->db->pdo();
-        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class ORDER BY class");
+        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class WHERE race_id = :race_id ORDER BY class");
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
         $record = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
         return $this->responder->success($record);
@@ -440,9 +441,11 @@ class RacegoController {
             "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
+            "WHERE laps.race_id = :race_id ".
             "GROUP BY user_id_ref ORDER BY 'rank' ASC";
 
             $result = $pdo->prepare($query);
+            $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
             $result->execute();
 
             $data = $result->fetchAll() ?: [];
@@ -452,11 +455,12 @@ class RacegoController {
             "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
-            "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class) ".
+            "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class AND user_class.race_id = :race_id) ".
             "GROUP BY user_id_ref ORDER BY 'rank' ASC";
 
             $result = $pdo->prepare($query);
             $result->bindParam(':class', $class, PDO::PARAM_STR);
+            $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
             $result->execute();
 
             $data = $result->fetchAll() ?: [];
