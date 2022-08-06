@@ -311,21 +311,24 @@ class RacegoController {
         $pdo = $this->db->pdo();
         
         // check if user_id is valid
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.user_id = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.user_id = :id AND user.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount != 1) return $this->responder->error($code_validation_failed , "post ontrack", "User doesn't exists");
 
         // check if user is already on track
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id and track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0) return $this->responder->error($code_entry_exists , "post ontrack", "User is already on track");
 
         // insert
-        $result = $pdo->prepare("INSERT INTO `track` (track.user_id_ref) VALUES (:id)");
+        $result = $pdo->prepare("INSERT INTO `track` (track.race_id, track.user_id_ref) VALUES (:race_id, :id)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
         $result->execute();
 
@@ -346,8 +349,9 @@ class RacegoController {
             return $this->responder->error($code_validation_failed, "delete ontrack", "Invalid input data");
 
         // remove categories from user
-        $result = $this->db->pdo()->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $this->db->pdo()->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // return
