@@ -17,6 +17,7 @@ class RaceManageController {
 
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
+        $router->register('GET', '/v1/races', array($this, 'getRaces'));
         $router->register('POST', '/v1/race/manager', array($this, 'addManager'));
         $router->register('DELETE', '/v1/race/manager', array($this, 'deleteManager'));
         
@@ -25,6 +26,29 @@ class RaceManageController {
         $this->db->pdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     }
 
+    function getRaces($request){
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+
+        $userID = intval($_SESSION['user']['id']);
+
+        if( $userID <= 0){
+            return $this->responder->error($code_validation_failed, "get races", "Invalid input data");
+        } 
+        
+        $pdo = $this->db->pdo();
+        $sql =  "SELECT race_relations.race_id as id, race_overview.race_name as name, a.manager as manager, race_relations.is_admin FROM race_relations ".
+                "LEFT JOIN ( ".
+                "SELECT race_id, COUNT(login_id) as manager FROM race_relations GROUP BY race_id) AS a ".
+                "ON race_relations.race_id = a.race_id ".
+                "LEFT JOIN race_overview ON race_relations.race_id = race_overview.race_id ".
+                "WHERE race_relations.login_id = :login_id";
+        $result = $pdo->prepare( $sql );
+        $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
+        $result->execute();
+
+        $record = $result->fetchAll() ?: [];
+        return $this->responder->success($record);
+    }
 
     function addManager(){
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
