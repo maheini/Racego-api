@@ -25,6 +25,35 @@ class RaceManageController {
     }
 
 
+
+    function deleteManager(){
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $body = $request->getParsedBody();
+        if(!$body) return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
+
+        $userName = strval($body->username);
+        $raceID = strval($body->$id);
+
+        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
+
+        if( $raceID <= 0 || empty($body->race_name) || !ctype_alpha($body->race_name)){
+            return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
+        }
+
+        $pdo = $this->db->pdo();
+        $result = $pdo->prepare("SELECT id FROM login WHERE username = :username");
+        $result->bindParam(':username', $userName, PDO::PARAM_STR);
+        $result->execute();
+        $userID = $result->fetchColumn(0);
+        if( $userID <= 0 ){
+            return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
+        }
+
+        $result = $pdo->prepare( "DELETE FROM race_relations WHERE login_id = :login_id" );
+        $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
+        $result->execute();
+
+        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
 
         function validateRaceAccess( $raceID ){
