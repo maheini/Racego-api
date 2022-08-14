@@ -21,7 +21,7 @@ class RaceManageController {
         $router->register('DELETE', '/v1/race', array($this, 'deleteRace'));
         $router->register('GET', '/v1/managers/*', array($this, 'getManagers'));
         $router->register('POST', '/v1/race/manager', array($this, 'addManager'));
-        $router->register('DELETE', '/v1/race/manager', array($this, 'deleteManager'));
+        $router->register('UPDATE', '/v1/race/*', array($this, 'updateRaceDetails'));
         
         $this->responder = $responder;
         $this->db = $db;
@@ -144,99 +144,132 @@ class RaceManageController {
         return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
 
-    function getManagers($request){
+    function getRaceDetails($request){
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
 
         //input validation
         $raceID = intval(Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3));
 
         if( $raceID <= 0){
-            return $this->responder->error($code_validation_failed, "add manager", "Invalid input data");
+            return $this->responder->error($code_validation_failed, "get race", "Invalid input data");
         }
 
         if( !$this->validateRaceAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
 
+        // get race id & name
         $pdo = $this->db->pdo();
-        $sql =  "SELECT login.id as id, login.username as username, race_relations.is_admin as is_admin FROM race_overview ". 
-                "LEFT JOIN race_relations ON race_overview.race_id = race_relations.race_id ".
-                "LEFT JOIN login ON race_relations.login_id = login.id ".
-                "WHERE race_overview.race_id = :race_id;";
+        $sql = 'SELECT race_overview.race_id AS id, race_overview.race_name AS name FROM race_overview WHERE race_overview.race_id = :id';
         $result = $pdo->prepare( $sql );
-        $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
+        $result->bindParam( ':id', $raceID );
         $result->execute();
+        if( !$raceData = $result->fetch())
+            return $this->responder->error($code_validation_failed, "get racedetails", "No race details found with this ID");
 
-        $record = $result->fetchAll() ?: [];
-        return $this->responder->success($record);
+        // get managers
+        $pdo = $this->db->pdo();
+        $sql = 'SELECT login.username as username, race_relations.is_admin as is_admin FROM race_relations '.
+                'LEFT JOIN login ON login.id = race_relations.login_id '.
+                'WHERE race_relations.race_id = :race_id';
+        $result = $pdo->prepare( $sql );
+        $result->bindParam( ':race_id', $raceID );
+        $result->execute();
+        $raceManager = $result->fetchAll() ?: [];
+
+        $response = (object) array( 'id' => $raceData['id'], 'name' => $raceData['name'] );
+        $response->race_manager = $raceManager;
+
+        // return
+        return $this->responder->success($response);
     }
 
-    function addManager(){
+    function updateRaceDetails($request){
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+        $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
+
+
+        //input validation
+        $raceID = intval(Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3));
+
+        if( $raceID <= 0){
+            return $this->responder->error($code_validation_failed, "update race", "Invalid input data");
+        }
+
+        if( !$this->validateRaceAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
+
+
+        // Get body and validate all values
         $body = $request->getParsedBody();
-        if(!$body) return $this->responder->error($code_validation_failed, "add manager", "Invalid input data");
+        if( !$body )
+            return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
 
-        $userName = strval($body->username);
-        $raceID = strval($body->$id);
-
-        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
-
-        if( $raceID <= 0 || empty($userName) || !ctype_alpha($userName)){
-            return $this->responder->error($code_validation_failed, "add manager", "Invalid input data");
-        }
-
+        $name = $body->name;
+        $managers = $body->race_manager;
         $pdo = $this->db->pdo();
-        $result = $pdo->prepare("SELECT id FROM login WHERE username = :username");
-        $result->bindParam(':username', $userName, PDO::PARAM_STR);
-        $result->execute();
-        $userID = $result->fetchColumn(0);
-        if( $userID <= 0 ){
-            return $this->responder->error($code_validation_failed, "add manager", "Invalid input data");
-        }
 
-        // Check if the user is already a manager
-        $result = $pdo->prepare("SELECT id FROM race_relations WHERE login_id = :login_id");
-        $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
-        $result->execute();
-        if( $result->rowCount() > 0 ){
-            $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
-            return $this->responder->error($code_entry_exists , "add manager", "User is already a manager");
-        }
+        //Validate Race name
+        if( empty($name) || !ctype_alpha($name) )
+            return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
 
-        $result = $pdo->prepare( "INSERT INTO race_relations (login_id, race_id) VALUES (:login_id, :race_id)" );
-        $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
+        // Validate managers array
+        if( !is_array($managers) || count($managers) <= 0 )
+            return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
+        $admin_set = false;
+        
+        foreach( $managers as $manager ){
+            $username = $manager->username;
+            $is_admin = $manager->is_admin;
+
+            // validate input data
+            if( empty($username) || !ctype_alpha($username) || !intval($is_admin) )
+                return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
+            // check if user exists and is valid
+            $result = $pdo->prepare("SELECT COUNT(*) FROM login WHERE login.username = :username");
+            $result->bindParam(':username', $username, PDO::PARAM_STR);
+            $result->execute();
+            $recordcount = $result->fetchColumn();
+            if($recordcount != 1)
+                return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
+            
+            // check if user is admin and if admin is still set to true...
+            if( $username == $_SESSION['user']['username'] && $is_admin )
+                $admin_set = true;
+        }
+        if( !$admin_set )
+            return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
+
+        // start transaction
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
+
+        // Update Race
+        $result = $pdo->prepare("UPDATE race_overview SET race_overview.race_name = :race_name WHERE race_overview.race_id = :race_id");
+        $result->bindParam(':race_name', $name, PDO::PARAM_STR);
         $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
         $result->execute();
-
-        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
-    }
-
-    function deleteManager(){
-        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
-        $body = $request->getParsedBody();
-        if(!$body) return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
-
-        $userName = strval($body->username);
-        $raceID = strval($body->$id);
-
-        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
-
-        if( $raceID <= 0 || empty($body->race_name) || !ctype_alpha($body->race_name)){
-            return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
+        if( $result->rowCount() <= 0 ){
+            $pdo->rollBack();
+            return $this->responder->error($code_internal_error , "update race", "Failed to update race.");
         }
 
-        $pdo = $this->db->pdo();
-        $result = $pdo->prepare("SELECT id FROM login WHERE username = :username");
-        $result->bindParam(':username', $userName, PDO::PARAM_STR);
+        // update race managers
+        $result = $pdo->prepare("DELETE FROM race_relations WHERE race_relations.race_id = :race_id");
+        $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
         $result->execute();
-        $userID = $result->fetchColumn(0);
-        if( $userID <= 0 ){
-            return $this->responder->error($code_validation_failed, "delete manager", "Invalid input data");
+        
+        // bindvalue is 1-indexed, so $k+1
+        foreach( $managers as $manager ){
+            // insert race manager
+            $result = $pdo->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) SELECT login.id, :race_id, :is_admin FROM login WHERE login.username = :username");
+            $result->bindParam(':username', $manager->username, PDO::PARAM_STR);
+            $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
+            $result->bindParam(':is_admin', $raceID, PDO::PARAM_BOOL);
+            $result->execute();
         }
 
-        $result = $pdo->prepare( "DELETE FROM race_relations WHERE login_id = :login_id" );
-        $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
-        $result->execute();
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
 
-        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
+        // return
+        return $this->responder->success(['result' => 'successful']);
     }
 
         function validateRaceAccess( $raceID ){
