@@ -2,8 +2,6 @@
 
 // RaceManageController
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Tqdev\PhpCrudApi\Cache\Cache;
 use Tqdev\PhpCrudApi\Column\ReflectionService;
 use Tqdev\PhpCrudApi\Controller\Responder;
