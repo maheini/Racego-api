@@ -20,6 +20,7 @@ class RaceManageController {
         $router->register('GET', '/v1/races', array($this, 'getRaces'));
         $router->register('POST', '/v1/race', array($this, 'addRace'));
         $router->register('UPDATE', '/v1/race', array($this, 'updateRace'));
+        $router->register('DELETE', '/v1/race', array($this, 'deleteRace'));
         $router->register('GET', '/v1/managers/*', array($this, 'getManagers'));
         $router->register('POST', '/v1/race/manager', array($this, 'addManager'));
         $router->register('DELETE', '/v1/race/manager', array($this, 'deleteManager'));
@@ -283,3 +284,7 @@ class RaceManageController {
             }
         }
     }
+
+}
+
+?>
