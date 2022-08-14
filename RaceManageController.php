@@ -18,6 +18,7 @@ class RaceManageController {
     public function __construct(Router $router, Responder $responder, GenericDB $db, ReflectionService $reflection, Cache $cache)
     {
         $router->register('GET', '/v1/races', array($this, 'getRaces'));
+        $router->register('POST', '/v1/race', array($this, 'addRace'));
         $router->register('POST', '/v1/race/manager', array($this, 'addManager'));
         $router->register('DELETE', '/v1/race/manager', array($this, 'deleteManager'));
         
@@ -50,6 +51,45 @@ class RaceManageController {
         return $this->responder->success($record);
     }
 
+    function addRace($request){
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+
+        //input validation
+        $body = $request->getParsedBody();
+        if( !$body || empty($body->name) || !ctype_alpha($body->name)){
+            return $this->responder->error($code_validation_failed, "add race", "Invalid input data");
+        }
+
+        // start transaction
+        $pdo = $this->db->pdo();
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
+
+
+        // Add race
+        $result = $this->db->pdo()->prepare("INSERT INTO race_overview (race_name) VALUES (:race_name)");
+        $result->bindParam(':race_name', $body->name, PDO::PARAM_STR);
+        $result->execute();
+        if( $result->rowCount() <= 0 ){
+            $pdo->rollBack();
+            return $this->responder->error($code_internal_error , "add race", "Failed to insert race.");
+        }
+
+        // get new id
+        $result = $pdo->prepare("SELECT LAST_INSERT_ID()");
+        $result->execute();
+        $pkValue = $result->fetchColumn(0);
+        
+        $result = $this->db->pdo()->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) VALUES (:login_id, :race_id, true)");
+        $result->bindParam(':login_id', $_SESSION['user']['id'], PDO::PARAM_INT);
+        $result->bindParam(':race_id', $pkValue, PDO::PARAM_INT);
+        $result->execute();
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        // return
+        return $this->responder->success(['race_id' =>  $pkValue]);
+    }
     function addManager(){
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $body = $request->getParsedBody();
