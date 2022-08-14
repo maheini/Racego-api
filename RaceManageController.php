@@ -20,6 +20,7 @@ class RaceManageController {
         $router->register('GET', '/v1/races', array($this, 'getRaces'));
         $router->register('POST', '/v1/race', array($this, 'addRace'));
         $router->register('UPDATE', '/v1/race', array($this, 'updateRace'));
+        $router->register('GET', '/v1/managers/*', array($this, 'getManagers'));
         $router->register('POST', '/v1/race/manager', array($this, 'addManager'));
         $router->register('DELETE', '/v1/race/manager', array($this, 'deleteManager'));
         
@@ -143,6 +144,32 @@ class RaceManageController {
 
         return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
     }
+
+    function getManagers($request){
+        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
+
+        //input validation
+        $raceID = intval(Tqdev\PhpCrudApi\RequestUtils::getPathSegment($request, 3));
+
+        if( $raceID <= 0){
+            return $this->responder->error($code_validation_failed, "add manager", "Invalid input data");
+        }
+
+        if( !$this->validateRaceAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
+
+        $pdo = $this->db->pdo();
+        $sql =  "SELECT login.id as id, login.username as username, race_relations.is_admin as is_admin FROM race_overview ". 
+                "LEFT JOIN race_relations ON race_overview.race_id = race_relations.race_id ".
+                "LEFT JOIN login ON race_relations.login_id = login.id ".
+                "WHERE race_overview.race_id = :race_id;";
+        $result = $pdo->prepare( $sql );
+        $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
+        $result->execute();
+
+        $record = $result->fetchAll() ?: [];
+        return $this->responder->success($record);
+    }
+
     function addManager(){
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $body = $request->getParsedBody();
