@@ -67,7 +67,7 @@ class RaceManageController {
 
 
         // Add race
-        $result = $this->db->pdo()->prepare("INSERT INTO race_overview (race_name) VALUES (:race_name)");
+        $result = $this->db->pdo->prepare("INSERT INTO race_overview (race_name) VALUES (:race_name)");
         $result->bindParam(':race_name', $body->name, PDO::PARAM_STR);
         $result->execute();
         if( $result->rowCount() <= 0 ){
@@ -80,7 +80,7 @@ class RaceManageController {
         $result->execute();
         $pkValue = $result->fetchColumn(0);
         
-        $result = $this->db->pdo()->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) VALUES (:login_id, :race_id, true)");
+        $result = $this->db->pdo->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) VALUES (:login_id, :race_id, true)");
         $result->bindParam(':login_id', $_SESSION['user']['id'], PDO::PARAM_INT);
         $result->bindParam(':race_id', $pkValue, PDO::PARAM_INT);
         $result->execute();
@@ -272,7 +272,7 @@ class RaceManageController {
         return $this->responder->success(['result' => 'successful']);
     }
 
-        function validateRaceAccess( $raceID ){
+    function validateRaceAccess( $raceID ){
         $raceID = intval($raceID);
         if ( !isset($_SESSION['user']['id']) ){
             return false;
