@@ -10,6 +10,7 @@
 use Tqdev\PhpCrudApi\Config;
 
 include 'RacegoController.php';
+include 'RaceManageController.php';
 
 $config = new Config([
         // debugging
@@ -26,7 +27,7 @@ $config = new Config([
 
         // controller settings
         'controllers' => '',
-        'customControllers' => 'RacegoController',
+        'customControllers' => 'RacegoController, RaceManageController',
         
         // auth settings
         'middlewares' => 'cors,dbAuth,authorization',
