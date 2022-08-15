@@ -92,29 +92,6 @@ class RaceManageController {
         return $this->responder->success(['race_id' =>  $pkValue]);
     }
 
-    function updateRace( $request ){
-        $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
-        $body = $request->getParsedBody();
-        if(!$body) return $this->responder->error($code_validation_failed, "update race", "Invalid input data");
-
-        $raceID = intval($body->id);
-        $raceName = strval($body->$name);
-
-        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
-
-        if( empty($raceName) || !ctype_alpha($raceName) || $raceID <= 0 ){
-            return $this->responder->error($code_validation_failed, "update race", "Invalid input data");
-        }
-
-        $pdo = $this->db->pdo();
-        $result = $pdo->prepare("UPDATE race_overview SET race_name = :race_name WHERE race_id = :race_id");
-        $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
-        $result->bindParam(':race_name', $raceName, PDO::PARAM_STR);
-        $result->execute();
-
-        return $this->responder->success(['affected_rows' =>  $result->rowCount()]);
-    }
-
     function deleteRace($request) {
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $body = $request->getParsedBody();
