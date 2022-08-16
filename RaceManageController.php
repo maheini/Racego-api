@@ -237,7 +237,7 @@ class RaceManageController {
             $result = $pdo->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) SELECT login.id, :race_id, :is_admin FROM login WHERE login.username = :username");
             $result->bindParam(':username', $manager->username, PDO::PARAM_STR);
             $result->bindParam(':race_id', $raceID, PDO::PARAM_INT);
-            $result->bindParam(':is_admin', $raceID, PDO::PARAM_BOOL);
+            $result->bindParam(':is_admin', $manager->is_admin, PDO::PARAM_INT);
             $result->execute();
         }
 
