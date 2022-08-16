@@ -36,7 +36,7 @@ $config = new Config([
         },
         'dbAuth.sessionName' => 'TOKEN',
         'dbAuth.returnedColumns' => 'id, username',
-        'dbAuth.registerUser' => '0',   // disable registration of new user
+        'dbAuth.registerUser' => '1',   // disable registration of new user
         'dbAuth.usersTable' => 'login',
         'dbAuth.usernameColumn' => 'username',
         'dbAuth.passwordColumn' => 'password',
