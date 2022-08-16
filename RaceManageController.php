@@ -196,7 +196,7 @@ class RaceManageController {
             $is_admin = $manager->is_admin;
 
             // validate input data
-            if( empty($username) || !is_string($username) || !intval($is_admin) )
+            if( empty($username) || !is_string($username) || !is_numeric($is_admin) )
                 return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
             // check if user exists and is valid
             $result = $pdo->prepare("SELECT COUNT(*) FROM login WHERE login.username = :username");
