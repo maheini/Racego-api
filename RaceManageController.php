@@ -56,7 +56,7 @@ class RaceManageController {
 
         //input validation
         $body = $request->getParsedBody();
-        if( !$body || empty($body->name) || !ctype_alpha($body->name)){
+        if( !$body || empty($body->name) || !ctype_alnum($body->name)){
             return $this->responder->error($code_validation_failed, "add race", "Invalid input data");
         }
 
@@ -66,11 +66,11 @@ class RaceManageController {
 
 
         // Add race
-        $result = $this->db->pdo->prepare("INSERT INTO race_overview (race_name) VALUES (:race_name)");
+        $result = $pdo->prepare("INSERT INTO race_overview (race_name) VALUES (:race_name)");
         $result->bindParam(':race_name', $body->name, PDO::PARAM_STR);
         $result->execute();
         if( $result->rowCount() <= 0 ){
-            $pdo->rollBack();
+            $hhh->rollBack();
             return $this->responder->error($code_internal_error , "add race", "Failed to insert race.");
         }
 
@@ -79,7 +79,7 @@ class RaceManageController {
         $result->execute();
         $pkValue = $result->fetchColumn(0);
         
-        $result = $this->db->pdo->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) VALUES (:login_id, :race_id, true)");
+        $result = $pdo->prepare("INSERT INTO race_relations (login_id, race_id, is_admin) VALUES (:login_id, :race_id, true)");
         $result->bindParam(':login_id', $_SESSION['user']['id'], PDO::PARAM_INT);
         $result->bindParam(':race_id', $pkValue, PDO::PARAM_INT);
         $result->execute();
@@ -183,7 +183,7 @@ class RaceManageController {
         $pdo = $this->db->pdo();
 
         //Validate Race name
-        if( empty($name) || !ctype_alpha($name) )
+        if( empty($name) || !ctype_alnum($name) )
             return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
 
         // Validate managers array
@@ -196,7 +196,7 @@ class RaceManageController {
             $is_admin = $manager->is_admin;
 
             // validate input data
-            if( empty($username) || !ctype_alpha($username) || !intval($is_admin) )
+            if( empty($username) || !ctype_alnum($username) || !intval($is_admin) )
                 return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
             // check if user exists and is valid
             $result = $pdo->prepare("SELECT COUNT(*) FROM login WHERE login.username = :username");
