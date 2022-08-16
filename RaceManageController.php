@@ -56,7 +56,7 @@ class RaceManageController {
 
         //input validation
         $body = $request->getParsedBody();
-        if( !$body || empty($body->name) || !ctype_alnum($body->name)){
+        if( !$body || empty($body->name) || !is_string($body->name)){
             return $this->responder->error($code_validation_failed, "add race", "Invalid input data");
         }
 
@@ -183,7 +183,7 @@ class RaceManageController {
         $pdo = $this->db->pdo();
 
         //Validate Race name
-        if( empty($name) || !ctype_alnum($name) )
+        if( empty($name) || !is_string($name) )
             return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
 
         // Validate managers array
@@ -196,7 +196,7 @@ class RaceManageController {
             $is_admin = $manager->is_admin;
 
             // validate input data
-            if( empty($username) || !ctype_alnum($username) || !intval($is_admin) )
+            if( empty($username) || !is_string($username) || !intval($is_admin) )
                 return $this->responder->error($code_validation_failed, "update race details", "Invalid input data");
             // check if user exists and is valid
             $result = $pdo->prepare("SELECT COUNT(*) FROM login WHERE login.username = :username");
