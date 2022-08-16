@@ -42,7 +42,7 @@ class RaceManageController {
                 "SELECT race_id, COUNT(login_id) as manager FROM race_relations GROUP BY race_id) AS a ".
                 "ON race_relations.race_id = a.race_id ".
                 "LEFT JOIN race_overview ON race_relations.race_id = race_overview.race_id ".
-                "WHERE race_relations.login_id = :login_id";
+                "WHERE race_relations.login_id = :login_id ORDER BY id";
         $result = $pdo->prepare( $sql );
         $result->bindParam(':login_id', $userID, PDO::PARAM_INT);
         $result->execute();
