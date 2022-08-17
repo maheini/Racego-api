@@ -130,7 +130,7 @@ class RaceManageController {
             return $this->responder->error($code_validation_failed, "get race", "Invalid input data");
         }
 
-        if( !$this->validateRaceAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
+        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
 
         // get race id & name
         $pdo = $this->db->pdo();
@@ -170,8 +170,7 @@ class RaceManageController {
             return $this->responder->error($code_validation_failed, "update race", "Invalid input data");
         }
 
-        if( !$this->validateRaceAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
-
+        if( !$this->validateAdminAccess($raceID) ) return $this->responder->error(401, 'Unauthorized');
 
         // Get body and validate all values
         $body = $request->getParsedBody();
