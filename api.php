@@ -7924,6 +7924,9 @@ namespace Tqdev\PhpCrudApi\Middleware {
                     if (!$registerUser) {
                         return $this->responder->error(ErrorCode::AUTHENTICATION_FAILED, $username);
                     }
+                    if(strlen(trim($username)) == 0){
+                        return $this->responder->error(ErrorCode::USERNAME_EMPTY, $username);
+                    }
                     if (strlen($password) < $passwordLength) {
                         return $this->responder->error(ErrorCode::PASSWORD_TOO_SHORT, $passwordLength);
                     }
@@ -10575,6 +10578,7 @@ namespace Tqdev\PhpCrudApi\Record {
         const USER_ALREADY_EXIST = 1020;
         const PASSWORD_TOO_SHORT = 1021;
         const ENTRY_ALREADY_EXISTS = 1022;
+        const USERNAME_EMPTY = 1023;
 
         private $values = [
             0000 => ["Success", ResponseFactory::OK],
@@ -10601,6 +10605,7 @@ namespace Tqdev\PhpCrudApi\Record {
             1020 => ["User '%s' already exists", ResponseFactory::CONFLICT],
             1021 => ["Password too short (<%d characters)", ResponseFactory::UNPROCESSABLE_ENTITY],
             1022 => ["Entry '%s' already exists", ResponseFactory::CONFLICT],
+            1023 => ["Username is empty or only whitespaces", ResponseFactory::UNPROCESSABLE_ENTITY],
             9999 => ["%s", ResponseFactory::INTERNAL_SERVER_ERROR],
         ];
 
