@@ -32,7 +32,7 @@ $config = new Config([
         // auth settings
         'middlewares' => 'cors,dbAuth,authorization',
         'authorization.tableHandler' => function ($operation, $tableName) {
-            return $tableName != 'users';
+            return $tableName != 'login';
         },
         'dbAuth.sessionName' => 'TOKEN',
         'dbAuth.returnedColumns' => 'id, username',
