@@ -30,7 +30,7 @@ $config = new Config([
         'customControllers' => 'RacegoController, RaceManageController',
         
         // auth settings
-        'middlewares' => 'cors,dbAuth,authorization',
+        'middlewares' => 'dbAuth,authorization',
         'authorization.tableHandler' => function ($operation, $tableName) {
             return $tableName != 'login';
         },
