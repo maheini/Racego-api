@@ -214,8 +214,10 @@ class RacegoController {
         $body = $request->getParsedBody();
         if( !$body || empty($body->first_name) || empty($body->last_name))
             return $this->responder->error($code_validation_failed, "add user", "Invalid input data");
-        
+
+        // start transaction
         $pdo = $this->db->pdo();
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // check existence
         $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user.race_id = :race_id");
@@ -226,19 +228,52 @@ class RacegoController {
         $recordcount = $result->fetchColumn();
         if($recordcount > 0)
             return $this->responder->error($code_entry_exists , "add user", "Entry already exists");
-        
+
         // insert
         $result = $pdo->prepare("INSERT INTO `user` (user.race_id, user.forname, user.surname) VALUES (:race_id, :first_name, :last_name)");
         $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
         $result->execute();
-        
+
         // get new id
         $result = $pdo->prepare("SELECT LAST_INSERT_ID()");
         $result->execute();
-        $pkValue = $result->fetchColumn(0);
-        return $this->responder->success(['inserted_id' =>  (int) $pkValue]);
+        $id = intval($result->fetchColumn(0));
+
+        // validate the id
+        if( $id <= 0 ) return $this->responder->error($code_internal_error , "Add user", "Failed inserting user"); 
+
+        // add all race_classes to the user
+        if(!empty($body->class) && is_array($body->class)){
+            foreach($body->class as $classname){
+                if(!empty($classname) && is_string($classname)){
+                    $result = $pdo->prepare("INSERT INTO user_class (race_id, user_id_ref, class) VALUES (:race_id, :id, :class)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
+                    $result->bindParam(':class', $classname, PDO::PARAM_STR);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "class is invalid");
+            }
+        }
+
+        // add all lap_times
+        if(!empty($body->laps) && is_array($body->laps)){
+            foreach($body->laps as $lap_time){
+                if(!empty($lap_time) && $this->isValidTime($lap_time)){
+                    $result = $pdo->prepare("INSERT INTO laps (race_id, user_id_ref, lap_time) VALUES (:race_id, :id, :lap_time)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
+            }
+        }
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        return $this->responder->success(['inserted_id' =>  $id]);
     }
 
     public function deleteUser(ServerRequestInterface $request)
