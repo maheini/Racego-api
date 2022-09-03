@@ -57,9 +57,11 @@ class RacegoController {
         if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
             return $this->responder->error(401, 'Unauthorized');
         }
-        $sql =  "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track ".
+        $sql =  "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name, COUNT(lap_time) AS lap_count  FROM track ".
                 "LEFT JOIN user ON track.user_id_ref = user.user_id  ".
+                "LEFT JOIN laps ON track.user_id_ref = laps.user_id_ref ".
                 "WHERE track.race_id = :race_id ".
+                "GROUP BY forname, surname, id ".
                 "ORDER BY track.id";
         $stmt = $this->db->pdo()->prepare($sql);
         $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
