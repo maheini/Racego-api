@@ -35,11 +35,16 @@ class RacegoController {
 
     public function getUser(ServerRequestInterface $request)
     {
-        $sql = "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count 
-        FROM user LEFT JOIN laps ON user.user_id = laps.user_id_ref 
-        GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count";
-
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
+        $sql =  "SELECT user_id AS id, surname AS last_name, forname AS first_name, COUNT(lap_time) AS lap_count FROM user ".
+                "LEFT JOIN laps ON user.user_id = laps.user_id_ref ".
+                "WHERE user.race_id = :race_id ".
+                "GROUP BY forname, surname, user_id ORDER BY forname, surname, lap_count;";
         $stmt = $this->db->pdo()->prepare($sql);
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
 
         $record = $stmt->fetchAll() ?: [];
@@ -48,11 +53,18 @@ class RacegoController {
 
     public function getTrack(ServerRequestInterface $request)
     {
-        $sql = "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name FROM track
-                LEFT JOIN user 
-                ON track.user_id_ref = user.user_id ORDER BY track.id";
-
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
+        $sql =  "SELECT user.user_id AS id, user.forname AS first_name, user.surname AS last_name, COUNT(lap_time) AS lap_count  FROM track ".
+                "LEFT JOIN user ON track.user_id_ref = user.user_id  ".
+                "LEFT JOIN laps ON track.user_id_ref = laps.user_id_ref ".
+                "WHERE track.race_id = :race_id ".
+                "GROUP BY forname, surname, id ".
+                "ORDER BY track.id";
         $stmt = $this->db->pdo()->prepare($sql);
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
 
         $record = $stmt->fetchAll() ?: [];
@@ -61,6 +73,10 @@ class RacegoController {
 
     public function getUserDetails(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
     
         //input validation
@@ -70,21 +86,24 @@ class RacegoController {
         $pdo = $this->db->pdo();
 
         // get general user_data
-        $result = $pdo->prepare("SELECT user_id AS id, forname AS first_name, surname AS last_name  FROM `user` WHERE user_id = :id");
+        $result = $pdo->prepare("SELECT user_id AS id, forname AS first_name, surname AS last_name  FROM `user` WHERE user_id = :id AND race_id = :race_id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         if( !$userData = $result->fetch())
             return $this->responder->error($code_validation_failed, "get userdetails", "No user found with this ID");
 
         // get user classes
-        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id ORDER BY class");
+        $result = $pdo->prepare("SELECT class FROM user_class WHERE user_id_ref = :id AND race_id = :race_id ORDER BY class");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $classData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         // get laps
-        $result = $pdo->prepare("SELECT lap_time FROM laps WHERE user_id_ref = :id ORDER BY id");
+        $result = $pdo->prepare("SELECT SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9) AS lap_time FROM laps WHERE user_id_ref = :id AND race_id = :race_id ORDER BY id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $lapData = $result->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
@@ -99,6 +118,10 @@ class RacegoController {
 
     public function setUserDetails(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
@@ -113,18 +136,21 @@ class RacegoController {
         $pdo = $this->db->pdo();
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
-        // check if any user with id exists
-        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user_id = :id");
+        // check if any user with id exists within the current race
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user_id = :id AND race_id = :race_id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount <= 0) return $this->responder->error($code_validation_failed , "update user", "ID invalid");
 
-        // check if first_name and last_name are already given
-        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user_id <> :id");
+        // check if first_name and last_name are already given in the current race
+        $result = $this->db->pdo()->prepare("SELECT COUNT(*) FROM `user` ".
+                        "WHERE user.forname = :first_name AND user.surname = :last_name AND user_id <> :id AND race_id = :race_id");
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
         $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0) return $this->responder->error($code_entry_exists , "update user", "first_name and last_name already exist");
@@ -136,15 +162,16 @@ class RacegoController {
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
 
-        // delete all race-classes
+        // delete all race-classes of the current user
         $result = $pdo->prepare("DELETE FROM user_class WHERE user_id_ref = :id");
         $result->bindParam(':id', $id, PDO::PARAM_INT);
         $result->execute();
-        // add all race_class
+        // add all race_classes to the user
         if(!empty($body->class) && is_array($body->class)){
             foreach($body->class as $classname){
                 if(!empty($classname) && is_string($classname)){
-                    $result = $pdo->prepare("INSERT INTO user_class (class, user_id_ref) VALUES (:class, :id)");
+                    $result = $pdo->prepare("INSERT INTO user_class (race_id, user_id_ref, class) VALUES (:race_id, :id, :class)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
                     $result->bindParam(':class', $classname, PDO::PARAM_STR);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
                     $result->execute();
@@ -160,9 +187,10 @@ class RacegoController {
         if(!empty($body->laps) && is_array($body->laps)){
             foreach($body->laps as $lap_time){
                 if(!empty($lap_time) && $this->isValidTime($lap_time)){
-                    $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:lap_time, :id)");
-                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
+                    $result = $pdo->prepare("INSERT INTO laps (race_id, user_id_ref, lap_time) VALUES (:race_id, :id, :lap_time)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
                     $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
                     $result->execute();
                 } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
             }
@@ -177,6 +205,10 @@ class RacegoController {
 
     public function addUser(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
 
@@ -184,33 +216,74 @@ class RacegoController {
         $body = $request->getParsedBody();
         if( !$body || empty($body->first_name) || empty($body->last_name))
             return $this->responder->error($code_validation_failed, "add user", "Invalid input data");
-        
+
+        // start transaction
         $pdo = $this->db->pdo();
+        if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // check existence
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.forname = :first_name AND user.surname = :last_name AND user.race_id = :race_id");
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0)
             return $this->responder->error($code_entry_exists , "add user", "Entry already exists");
-        
+
         // insert
-        $result = $pdo->prepare("INSERT INTO `user` (user.forname, user.surname) VALUES (:first_name, :last_name)");
+        $result = $pdo->prepare("INSERT INTO `user` (user.race_id, user.forname, user.surname) VALUES (:race_id, :first_name, :last_name)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':first_name', $body->first_name, PDO::PARAM_STR);
         $result->bindParam(':last_name', $body->last_name, PDO::PARAM_STR);
         $result->execute();
-        
+
         // get new id
         $result = $pdo->prepare("SELECT LAST_INSERT_ID()");
         $result->execute();
-        $pkValue = $result->fetchColumn(0);
-        return $this->responder->success(['inserted_id' =>  (int) $pkValue]);
+        $id = intval($result->fetchColumn(0));
+
+        // validate the id
+        if( $id <= 0 ) return $this->responder->error($code_internal_error , "Add user", "Failed inserting user"); 
+
+        // add all race_classes to the user
+        if(!empty($body->class) && is_array($body->class)){
+            foreach($body->class as $classname){
+                if(!empty($classname) && is_string($classname)){
+                    $result = $pdo->prepare("INSERT INTO user_class (race_id, user_id_ref, class) VALUES (:race_id, :id, :class)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
+                    $result->bindParam(':class', $classname, PDO::PARAM_STR);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "class is invalid");
+            }
+        }
+
+        // add all lap_times
+        if(!empty($body->laps) && is_array($body->laps)){
+            foreach($body->laps as $lap_time){
+                if(!empty($lap_time) && $this->isValidTime($lap_time)){
+                    $result = $pdo->prepare("INSERT INTO laps (race_id, user_id_ref, lap_time) VALUES (:race_id, :id, :lap_time)");
+                    $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
+                    $result->bindParam(':id', $id, PDO::PARAM_INT);
+                    $result->bindParam(':lap_time', $lap_time, PDO::PARAM_STR);
+                    $result->execute();
+                } else return $this->responder->error($code_validation_failed , "update user", "lap_time is invalid");
+            }
+        }
+
+        // commit transaction
+        if(!$pdo->commit()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to commit transaction");
+
+        return $this->responder->success(['inserted_id' =>  $id]);
     }
 
     public function deleteUser(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
 
@@ -225,23 +298,27 @@ class RacegoController {
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // remove categories from user
-        $result = $pdo->prepare("DELETE FROM user_class WHERE user_class.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM user_class WHERE user_class.user_id_ref = :id AND user_class.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // remove laps from user
-        $result = $pdo->prepare("DELETE FROM laps WHERE laps.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM laps WHERE laps.user_id_ref = :id AND laps.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // remove from track
-        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         
         // remove user
-        $result = $pdo->prepare("DELETE FROM user WHERE user.user_id = :id");
+        $result = $pdo->prepare("DELETE FROM user WHERE user.user_id = :id AND user.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // commit transaction
@@ -256,6 +333,10 @@ class RacegoController {
 
     public function addOntrack(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_entry_exists = Tqdev\PhpCrudApi\Record\ErrorCode::ENTRY_ALREADY_EXISTS;
 
@@ -267,21 +348,24 @@ class RacegoController {
         $pdo = $this->db->pdo();
         
         // check if user_id is valid
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.user_id = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `user` WHERE user.user_id = :id AND user.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount != 1) return $this->responder->error($code_validation_failed , "post ontrack", "User doesn't exists");
 
         // check if user is already on track
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id and track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount > 0) return $this->responder->error($code_entry_exists , "post ontrack", "User is already on track");
 
         // insert
-        $result = $pdo->prepare("INSERT INTO `track` (track.user_id_ref) VALUES (:id)");
+        $result = $pdo->prepare("INSERT INTO `track` (track.race_id, track.user_id_ref) VALUES (:race_id, :id)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
         $result->execute();
 
@@ -290,6 +374,10 @@ class RacegoController {
 
     public function cancelLap(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
 
         //input validation
@@ -298,8 +386,9 @@ class RacegoController {
             return $this->responder->error($code_validation_failed, "delete ontrack", "Invalid input data");
 
         // remove categories from user
-        $result = $this->db->pdo()->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $this->db->pdo()->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // return
@@ -308,6 +397,10 @@ class RacegoController {
 
     public function submitLap(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
         $code_internal_error = Tqdev\PhpCrudApi\Record\ErrorCode::ERROR_NOT_FOUND;
 
@@ -321,21 +414,24 @@ class RacegoController {
         if(!$pdo->beginTransaction()) return $this->responder->error($code_internal_error , "Transaction failed", "Failed to start transaction");
 
         // check if user_id is on_track
-        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("SELECT COUNT(*) FROM `track` WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
         $recordcount = $result->fetchColumn();
         if($recordcount != 1) return $this->responder->error($code_validation_failed , "put ontrack", "User isn't on track");
 
         // insert time
-        $result = $pdo->prepare("INSERT INTO laps (lap_time, user_id_ref) VALUES (:time, :id)");
+        $result = $pdo->prepare("INSERT INTO laps (race_id, lap_time, user_id_ref) VALUES (:race_id, :time, :id)");
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
         $result->bindParam(':time', $body->time, PDO::PARAM_STR);
         $result->execute();
 
         // remove user from track
-        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id");
+        $result = $pdo->prepare("DELETE FROM track WHERE track.user_id_ref = :id AND track.race_id = :race_id");
         $result->bindParam(':id', $body->id, PDO::PARAM_INT);
+        $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $result->execute();
 
         // commit transaction
@@ -345,10 +441,15 @@ class RacegoController {
         return $this->responder->success(['result' =>  'successful']);
     }
 
-    public function getCategories()
+    public function getCategories($request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $pdo = $this->db->pdo();
-        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class ORDER BY class");
+        $stmt = $pdo->prepare("SELECT DISTINCT class FROM user_class WHERE race_id = :race_id ORDER BY class");
+        $stmt->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
         $stmt->execute();
         $record = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
         return $this->responder->success($record);
@@ -356,6 +457,10 @@ class RacegoController {
 
     public function getRanking(ServerRequestInterface $request)
     {
+        $header = $request->getServerParams();
+        if( !array_key_exists( 'HTTP_RACEID', $header ) || !$this->validateRaceAccess( $header['HTTP_RACEID'] ) ){
+            return $this->responder->error(401, 'Unauthorized');
+        }
         $code_validation_failed = Tqdev\PhpCrudApi\Record\ErrorCode::INPUT_VALIDATION_FAILED;
     
         //input validation
@@ -373,9 +478,11 @@ class RacegoController {
             "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
+            "WHERE laps.race_id = :race_id ".
             "GROUP BY user_id_ref ORDER BY 'rank' ASC";
 
             $result = $pdo->prepare($query);
+            $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
             $result->execute();
 
             $data = $result->fetchAll() ?: [];
@@ -385,11 +492,12 @@ class RacegoController {
             "MIN(SUBSTRING(TIME_FORMAT(lap_time, '%i:%s.%f'),1,9)) AS 'time', DENSE_RANK() OVER (ORDER BY MIN(lap_time) ASC) ".
             "AS 'rank' FROM laps ".
             "LEFT JOIN `user` ON laps.user_id_ref = `user`.user_id ".
-            "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class) ".
+            "WHERE laps.user_id_ref IN (SELECT user_class.user_id_ref FROM user_class WHERE class = :class AND user_class.race_id = :race_id) ".
             "GROUP BY user_id_ref ORDER BY 'rank' ASC";
 
             $result = $pdo->prepare($query);
             $result->bindParam(':class', $class, PDO::PARAM_STR);
+            $result->bindParam(':race_id', $header['HTTP_RACEID'], PDO::PARAM_INT);
             $result->execute();
 
             $data = $result->fetchAll() ?: [];
@@ -402,6 +510,28 @@ class RacegoController {
     {
         $timeObj = DateTime::createFromFormat($format, $time);
         return $timeObj && $timeObj->format($format) == $time;
+    }
+
+    function validateRaceAccess( $raceID ){
+        $raceID = intval($raceID);
+        if ( !isset($_SESSION['user']) ){
+            return false;
+        } else if ( $raceID <= 0 ){
+            return false;
+        } else {
+            $userID = $_SESSION['user']['id'];
+            $pdo = $this->db->pdo();
+            $stmt = $pdo->prepare("SELECT * FROM race_relations WHERE login_id=:login_id AND race_id = :race_id");
+            $stmt->bindParam(':login_id', $userID, PDO::PARAM_INT);
+            $stmt->bindParam(':race_id', $raceID, PDO::PARAM_INT);
+            $stmt->execute();
+            $recordcount = $stmt->fetchColumn();
+            if( !$recordcount ){
+                return false;
+            } else {
+                return true;
+            }
+        }
     }
     
 }

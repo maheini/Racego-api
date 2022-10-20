@@ -10,6 +10,7 @@
 use Tqdev\PhpCrudApi\Config;
 
 include 'RacegoController.php';
+include 'RaceManageController.php';
 
 $config = new Config([
         // debugging
@@ -26,16 +27,17 @@ $config = new Config([
 
         // controller settings
         'controllers' => '',
-        'customControllers' => 'RacegoController',
+        'customControllers' => 'RacegoController, RaceManageController',
         
         // auth settings
-        'middlewares' => 'cors,dbAuth,authorization',
+        'middlewares' => 'dbAuth,authorization',
         'authorization.tableHandler' => function ($operation, $tableName) {
-            return $tableName != 'users';
+            return $tableName != 'login';
         },
         'dbAuth.sessionName' => 'TOKEN',
-        'dbAuth.returnedColumns' => 'username',
-        'dbAuth.registerUser' => '0',   // disable registration of new user
+        'dbAuth.returnedColumns' => 'id, username',
+        'dbAuth.registerUser' => '1',   // disable registration of new user
+        'dbAuth.loginAfterRegistration' => '1',     // enable login after registration
         'dbAuth.usersTable' => 'login',
         'dbAuth.usernameColumn' => 'username',
         'dbAuth.passwordColumn' => 'password',
